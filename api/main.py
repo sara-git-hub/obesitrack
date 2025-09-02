@@ -14,10 +14,6 @@ app = FastAPI(
     title="ObesiTrack API",
     version="1.0",
     description="API de prédiction et gestion utilisateurs pour l'obésité",
-    contact={
-        "name": "ObesiTrack Team",
-        "email": "admin@obesitrack.com"
-    }
 )
 
 # Création de la base de données et des tables si elles n'existent pas
