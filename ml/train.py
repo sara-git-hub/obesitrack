@@ -5,6 +5,13 @@ from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import accuracy_score
 import joblib
+import datetime, json
+
+LABEL_MAP = {
+    "Insufficient_Weight": 0, "Normal_Weight": 1,
+    "Overweight_Level_I": 2, "Overweight_Level_II": 3,
+    "Obesity_Type_I": 4, "Obesity_Type_II": 5, "Obesity_Type_III": 6,
+}
 
 def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     data = df.copy()
@@ -12,18 +19,7 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     # Calcul de l'IMC
     data['IMC']=data['Weight']/(data['Height']**2)
 
-    # Mapping de la colonne NObeyesdad
-    map_NObeyesdad = {
-        "Insufficient_Weight": 0,
-        "Normal_Weight": 1,
-        "Overweight_Level_I": 2,
-        "Overweight_Level_II": 3,
-        "Obesity_Type_I": 4,
-        "Obesity_Type_II": 5,
-        "Obesity_Type_III": 6,
-    }
-
-    data["NObeyesdad_num"] = data["NObeyesdad"].map(map_NObeyesdad)
+    data["NObeyesdad_num"] = data["NObeyesdad"].map(LABEL_MAP)
 
     # --- Colonnes finales ---
     columns_select = ["IMC", "Height", "Weight", "FCVC", "NObeyesdad_num"]
@@ -61,7 +57,20 @@ def best_model(df):
     acc = accuracy_score(y_test, y_pred)
     print('accuracy:', acc)
 
-    joblib.dump(best_model, "C:\\Users\\lenovo\\Documents\\obesitrack\\ml\\data\\gradient_boosting_model.pkl")
+    joblib.dump(best_model, "ml/data/gradient_boosting_model.pkl")
+    with open("ml/data/metrics.json", "w") as f:
+        json.dump({
+            "accuracy": float(acc),
+            "date": datetime.date.today().isoformat(),
+            "algo": best_model.named_steps["clf"].__class__.__name__,
+            "train_size": len(X_train),
+            "test_size": len(X_test),
+            "classes": len(np.unique(y))
+        }, f, indent=2)
+
+    with open("ml/data/label_map.json", "w") as f:
+        json.dump({v: k for k, v in LABEL_MAP.items()}, f)
+
     print("Modèle sauvegardé avec succès !")
 
 

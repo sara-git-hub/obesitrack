@@ -1,0 +1,8 @@
+{
+  "accuracy": 0.983451536643026,
+  "date": "2025-09-02",
+  "algo": "GradientBoostingClassifier",
+  "train_size": 1688,
+  "test_size": 423,
+  "classes": 7
+}
