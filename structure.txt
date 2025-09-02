@@ -1,0 +1,27 @@
+obesitytrack/
+├─ api/
+│ ├─ main.py # Entrée FastAPI
+│ ├─ deps.py # Dépendances (DB, auth)
+│ ├─ auth.py # Routes auth (register/login)
+│ ├─ routes_predictions.py # Routes prédictions CRUD
+│ ├─ models.py # SQLAlchemy ORM
+│ ├─ schemas.py # Pydantic (Entrées/Sorties)
+│ ├─ security.py # Hash, JWT utils
+│ ├─ ml.py # Chargement/serving du modèle
+│ ├─ config.py # Paramètres (env)
+│ └─ __init__.py
+├─ ml/
+│ ├─ train.py # Script d'entraînement
+│ ├─ data/ # Données locales (optionnel)
+│ └─ model_artifacts/
+│ └─ model.pkl # Modèle entraîné (joblib)
+├─ migrations/ # Alembic
+├─ tests/
+│ ├─ test_auth.py
+│ ├─ test_predictions.py
+│ └─ test_health.py
+├─ .env.example
+├─ docker-compose.yml
+├─ Dockerfile
+├─ requirements.txt
+└─ README.md
