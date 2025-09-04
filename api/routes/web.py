@@ -6,7 +6,6 @@ from fastapi.templating import Jinja2Templates
 
 from ..deps import get_current_user, get_db
 from ..models import User, Prediction
-from .admin import verify_admin
 
 router = APIRouter(tags=["web"])
 templates = Jinja2Templates(directory="templates")
@@ -46,33 +45,3 @@ def predictions_page(request: Request):
     # Pas de current_user ici
     return templates.TemplateResponse("predictions.html", {"request": request})
 
-
-
-# ==============================
-#  Admin Dashboard
-# ==============================
-
-@router.get("/admin", response_class=HTMLResponse)
-def admin_dashboard(
-    request: Request,
-    admin_user: User = Depends(verify_admin),
-    db: Session = Depends(get_db)
-):
-    total_users = db.query(func.count(User.id)).scalar()
-    total_predictions = db.query(func.count(Prediction.id)).scalar()
-
-    # Répartition par classe
-    class_counts = db.query(Prediction.predicted_class, func.count(Prediction.id))\
-        .group_by(Prediction.predicted_class).all()
-    predictions_by_class = {cls: cnt for cls, cnt in class_counts}
-
-    return templates.TemplateResponse(
-        "admin.html",
-        {
-            "request": request,
-            "admin_user": admin_user,
-            "total_users": total_users,
-            "total_predictions": total_predictions,
-            "predictions_by_class": predictions_by_class
-        }
-    )

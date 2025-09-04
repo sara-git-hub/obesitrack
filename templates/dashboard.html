@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Dashboard Admin{% endblock %}
+
+{% block content %}
+<h1>Dashboard Admin</h1>
+
+<div id="stats">
+  <p>Total utilisateurs : <span id="totalUsers"></span></p>
+  <p>Total prédictions : <span id="totalPredictions"></span></p>
+  <p>Utilisateurs récents (7j) : <span id="recentUsers"></span></p>
+  <h3>Répartition des prédictions par classe :</h3>
+  <ul id="predByClass"></ul>
+</div>
+
+<script>
+async function loadStats() {
+    const res = await fetch("/admin/stats", {
+        headers: {"Authorization": "Bearer " + localStorage.getItem("access_token")}
+    });
+    const stats = await res.json();
+    document.getElementById("totalUsers").textContent = stats.total_users;
+    document.getElementById("totalPredictions").textContent = stats.total_predictions;
+    document.getElementById("recentUsers").textContent = stats.recent_users;
+
+    const ul = document.getElementById("predByClass");
+    ul.innerHTML = "";
+    for (const cls in stats.predictions_by_class) {
+        const li = document.createElement("li");
+        li.textContent = `${cls}: ${stats.predictions_by_class[cls]}`;
+        ul.appendChild(li);
+    }
+}
+
+loadStats();
+</script>
+{% endblock %}

@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from .config import settings
 from .deps import get_db, engine
 from .models import Base
-from .routes import auth, predictions, admin,web
+from .routes import auth, predictions, admin,web,admin_web
 
 # App FastAPI
 app = FastAPI(
@@ -32,6 +32,7 @@ templates = Jinja2Templates(directory="templates")
 app.include_router(auth.router)
 app.include_router(predictions.router)
 app.include_router(admin.router)
+app.include_router(admin_web.router)
 app.include_router(web.router)
 
 # Endpoints généraux
@@ -87,3 +88,4 @@ def get_model_metrics():
 #netstat -aon | findstr :8000
 #tasklist | findstr uvicorn
 #taskkill /PID <PID> /F
+#python -m uvicorn api.main:app --reload --port 8082

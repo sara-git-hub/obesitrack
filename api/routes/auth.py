@@ -7,7 +7,7 @@ from fastapi.templating import Jinja2Templates
 
 from ..schemas import UserCreate, Token
 from ..models import User
-from ..deps import get_db
+from ..deps import get_db,get_current_user
 from ..security import hash_password, verify_password, create_access_token
 from ..config import settings
 
@@ -40,8 +40,12 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     return {"access_token": token, "token_type": "bearer"}
 
 @router.get("/me")
-def read_current_user(current_user: User = Depends(get_db)):
-    return {"id": current_user.id, "email": current_user.email, "full_name": current_user.full_name, "created_at": current_user.created_at}
-
+def read_current_user(current_user: User = Depends(get_current_user)):
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "full_name": current_user.full_name,
+        "created_at": current_user.created_at
+    }
 
 

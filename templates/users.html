@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Admin - Utilisateurs{% endblock %}
+
+{% block content %}
+<h1 class="text-3xl font-bold mb-6">Gestion des utilisateurs</h1>
+
+<!-- Formulaire de modification -->
+<div id="editUserDiv" class="mb-6 p-4 bg-white rounded shadow hidden">
+    <h2 class="text-xl font-semibold mb-2">Modifier utilisateur</h2>
+    <form id="editUserForm" class="flex flex-col gap-2">
+        <input type="hidden" id="edit_user_id">
+        <input type="email" id="edit_email" placeholder="Email" required class="border p-2 rounded">
+        <input type="text" id="edit_full_name" placeholder="Nom complet" class="border p-2 rounded">
+        <input type="password" id="edit_password" placeholder="Mot de passe (laisser vide si inchangé)" class="border p-2 rounded">
+        <select id="edit_role" class="border p-2 rounded">
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+        </select>
+        <div class="flex gap-2">
+            <button type="submit" class="bg-green-500 text-white p-2 rounded">Enregistrer</button>
+            <button type="button" class="bg-gray-300 p-2 rounded" onclick="cancelEdit()">Annuler</button>
+        </div>
+    </form>
+</div>
+
+<!-- Liste des utilisateurs -->
+<div class="bg-white shadow rounded p-4">
+    <table class="min-w-full border">
+        <thead class="bg-gray-200">
+            <tr>
+                <th class="p-2">Email</th>
+                <th class="p-2">Nom complet</th>
+                <th class="p-2">Rôle</th>
+                <th class="p-2">Créé le</th>
+                <th class="p-2">Nombre de prédictions</th>
+                <th class="p-2">Actions</th>
+            </tr>
+        </thead>
+        <tbody id="usersTableBody"></tbody>
+    </table>
+</div>
+
+<script>
+    async function loadUsersList() {
+        try {
+            const res = await fetch("/admin/users", {
+                headers: {"Authorization": "Bearer " + localStorage.getItem("access_token")}
+            });
+            if (!res.ok) throw new Error("Erreur API");
+            const users = await res.json();
+            const tbody = document.getElementById("usersTableBody");
+            tbody.innerHTML = "";
+
+            users.forEach(u => {
+                const row = document.createElement("tr");
+                row.className = "border-b";
+                row.innerHTML = `
+                    <td class="p-2">${u.email}</td>
+                    <td class="p-2">${u.full_name || ""}</td>
+                    <td class="p-2">${u.role}</td>
+                    <td class="p-2">${new Date(u.created_at).toLocaleString()}</td>
+                    <td class="p-2">${u.predictions_count}</td>
+                    <td class="p-2">
+                        <button class="text-blue-500 mr-2" onclick="editUser('${u.id}', '${u.email}', '${u.full_name || ''}', '${u.role}')">Modifier</button>
+                        <button class="text-red-500" onclick="deleteUserById('${u.id}')">Supprimer</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        } catch(err) {
+            console.error(err);
+            alert("Erreur lors du chargement des utilisateurs.");
+        }
+    }
+
+    async function deleteUserById(userId) {
+        if (!confirm("Voulez-vous vraiment supprimer cet utilisateur ?")) return;
+        try {
+            const res = await fetch(`/admin/users/${userId}`, { 
+                method: "DELETE",
+                headers: {"Authorization": "Bearer " + localStorage.getItem("access_token")}
+            });
+            if (!res.ok) throw new Error("Erreur API");
+            const data = await res.json();
+            alert(data.message);
+            await loadUsersList();
+        } catch(err) {
+            console.error(err);
+            alert("Erreur lors de la suppression.");
+        }
+    }
+
+    function editUser(id, email, full_name, role) {
+        document.getElementById("editUserDiv").classList.remove("hidden");
+        document.getElementById("edit_user_id").value = id;
+        document.getElementById("edit_email").value = email;
+        document.getElementById("edit_full_name").value = full_name;
+        document.getElementById("edit_role").value = role;
+    }
+
+    function cancelEdit() {
+        document.getElementById("editUserDiv").classList.add("hidden");
+        document.getElementById("editUserForm").reset();
+    }
+
+    document.getElementById("editUserForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const userId = document.getElementById("edit_user_id").value;
+        const userData = {
+            email: document.getElementById("edit_email").value,
+            full_name: document.getElementById("edit_full_name").value,
+            password: document.getElementById("edit_password").value || undefined,
+            role: document.getElementById("edit_role").value
+        };
+        try {
+            const res = await fetch(`/admin/users/${userId}`, {
+                method: "PUT",
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + localStorage.getItem("access_token")
+                },
+                body: JSON.stringify(userData)
+            });
+            if (!res.ok) throw new Error("Erreur API");
+            cancelEdit();
+            await loadUsersList();
+        } catch(err) {
+            console.error(err);
+            alert("Erreur lors de la modification.");
+        }
+    });
+
+    // Charger la liste au démarrage
+    loadUsersList();
+</script>
+{% endblock %}

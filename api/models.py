@@ -1,6 +1,7 @@
 from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped, relationship
-from sqlalchemy import String, Text, JSON, ForeignKey, func
+from sqlalchemy import String, Text, JSON, ForeignKey, func,DateTime
 import uuid
+from datetime import datetime
 
 
 class Base(DeclarativeBase):
@@ -18,7 +19,7 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255))
     full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     role: Mapped[str] = mapped_column(String(50), server_default="user", nullable=False)
-    created_at: Mapped[str] = mapped_column(server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     predictions: Mapped[list["Prediction"]] = relationship(back_populates="user")
 
@@ -30,6 +31,6 @@ class Prediction(Base):
     payload_json: Mapped[dict] = mapped_column(JSON)
     predicted_class: Mapped[str] = mapped_column(String(100))
     proba: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[str] = mapped_column(server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="predictions")

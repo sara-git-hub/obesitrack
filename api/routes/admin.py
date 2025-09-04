@@ -1,21 +1,18 @@
-# api/routes/admin.py
-from fastapi import APIRouter, Depends, HTTPException, status
+# api/routes/admin_api.py
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from typing import List, Dict, Any
+from typing import List, Dict
+from datetime import datetime, timedelta
+
 from ..models import User, Prediction
-from ..schemas import UserInfo, AdminStats
+from ..schemas import UserInfo, AdminStats, UserCreate,UserUpdate
 from ..deps import get_db, get_current_user
-from pydantic import BaseModel
-from fastapi.templating import Jinja2Templates
+from ..security import hash_password
 
-
-templates = Jinja2Templates(directory="templates")
-
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(prefix="/admin", tags=["admin-api"])
 
 def verify_admin(current_user: User = Depends(get_current_user)):
-
     if current_user.role != 'admin':
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -24,57 +21,35 @@ def verify_admin(current_user: User = Depends(get_current_user)):
     return current_user
 
 @router.get("/users", response_model=List[UserInfo])
-def get_all_users(
-    limit: int = 100,
-    admin_user: User = Depends(verify_admin),
-    db: Session = Depends(get_db)
-):
-    """
-    Liste tous les utilisateurs avec le nombre de prédictions
-    """
+def get_all_users(limit: int = 100, admin_user: User = Depends(verify_admin), db: Session = Depends(get_db)):
     users_with_count = db.query(
         User,
         func.count(Prediction.id).label('predictions_count')
     ).outerjoin(Prediction).group_by(User.id).limit(limit).all()
-    
+
     return [
         UserInfo(
             id=user.id,
             email=user.email,
             full_name=user.full_name,
-            created_at=str(user.created_at),
+            role=user.role,
+            created_at=user.created_at.isoformat(),
             predictions_count=count
         )
         for user, count in users_with_count
     ]
 
 @router.get("/stats", response_model=AdminStats)
-def get_admin_stats(
-    admin_user: User = Depends(verify_admin),
-    db: Session = Depends(get_db)
-):
-    """
-    Statistiques générales pour l'admin
-    """
-    # Compteurs généraux
+def get_admin_stats(admin_user: User = Depends(verify_admin), db: Session = Depends(get_db)):
     total_users = db.query(func.count(User.id)).scalar()
     total_predictions = db.query(func.count(Prediction.id)).scalar()
     
-    # Répartition par classe de prédiction
-    predictions_by_class = {}
-    class_counts = db.query(
-        Prediction.predicted_class,
-        func.count(Prediction.id)
-    ).group_by(Prediction.predicted_class).all()
+    predictions_by_class = dict(
+        db.query(Prediction.predicted_class, func.count(Prediction.id)).group_by(Prediction.predicted_class).all()
+    )
     
-    for class_name, count in class_counts:
-        predictions_by_class[class_name] = count
-    
-    # Utilisateurs récents (7 derniers jours)
-    from datetime import datetime, timedelta
-    seven_days_ago = datetime.utcnow() - timedelta(days=7)
     recent_users = db.query(func.count(User.id))\
-        .filter(User.created_at >= seven_days_ago)\
+        .filter(User.created_at >= datetime.utcnow() - timedelta(days=7))\
         .scalar()
     
     return AdminStats(
@@ -85,27 +60,17 @@ def get_admin_stats(
     )
 
 @router.get("/users/{user_id}/predictions")
-def get_user_predictions_admin(
-    user_id: str,
-    limit: int = 50,
-    admin_user: User = Depends(verify_admin),
-    db: Session = Depends(get_db)
-):
-    """
-    Récupère les prédictions d'un utilisateur spécifique (vue admin)
-    """
+def get_user_predictions_admin(user_id: str, limit: int = 50,
+                               admin_user: User = Depends(verify_admin),
+                               db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Utilisateur non trouvé"
-        )
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
     
     predictions = db.query(Prediction)\
         .filter(Prediction.user_id == user_id)\
         .order_by(Prediction.created_at.desc())\
-        .limit(limit)\
-        .all()
+        .limit(limit).all()
     
     return {
         "user": {
@@ -115,62 +80,120 @@ def get_user_predictions_admin(
         },
         "predictions": [
             {
-                "id": pred.id,
-                "predicted_class": pred.predicted_class,
-                "proba": pred.proba,
-                "created_at": str(pred.created_at),
-                "input_data": pred.payload_json
-            }
-            for pred in predictions
+                "id": p.id,
+                "predicted_class": p.predicted_class,
+                "proba": p.proba,
+                "created_at": p.created_at.isoformat(),
+                "input_data": p.payload_json
+            } for p in predictions
         ]
     }
 
 @router.delete("/users/{user_id}")
-def delete_user(
-    user_id: str,
-    admin_user: User = Depends(verify_admin),
-    db: Session = Depends(get_db)
-):
-    """
-    Supprime un utilisateur et toutes ses prédictions
-    """
+def delete_user(user_id: str, admin_user: User = Depends(verify_admin), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Utilisateur non trouvé"
-        )
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
     
-    # Supprimer d'abord les prédictions (FK constraint)
     db.query(Prediction).filter(Prediction.user_id == user_id).delete()
-    
-    # Supprimer l'utilisateur
     db.delete(user)
     db.commit()
     
     return {"message": f"Utilisateur {user.email} supprimé avec succès"}
 
 @router.get("/predictions/recent")
-def get_recent_predictions(
-    limit: int = 50,
+def get_recent_predictions(limit: int = 50, admin_user: User = Depends(verify_admin), db: Session = Depends(get_db)):
+    predictions = db.query(Prediction, User.email)\
+        .join(User)\
+        .order_by(Prediction.created_at.desc())\
+        .limit(limit).all()
+    
+    return [
+        {
+            "id": p.id,
+            "user_email": email,
+            "predicted_class": p.predicted_class,
+            "created_at": p.created_at.isoformat()
+        } for p, email in predictions
+    ]
+
+@router.post("/users", response_model=UserInfo)
+def create_user(
+    user_data: UserCreate = Body(...),
     admin_user: User = Depends(verify_admin),
     db: Session = Depends(get_db)
 ):
     """
-    Récupère les prédictions récentes (toutes users)
+    Crée un nouvel utilisateur (accessible uniquement aux admins)
     """
-    predictions = db.query(Prediction, User.email)\
-        .join(User)\
-        .order_by(Prediction.created_at.desc())\
-        .limit(limit)\
-        .all()
+    # Vérifier que l'email n'existe pas déjà
+    existing_user = db.query(User).filter(User.email == user_data.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email déjà utilisé")
     
-    return [
-        {
-            "id": pred.id,
-            "user_email": user_email,
-            "predicted_class": pred.predicted_class,
-            "created_at": str(pred.created_at)
-        }
-        for pred, user_email in predictions
-    ]
+    # Hasher le mot de passe
+    hashed_password = hash_password(user_data.password)
+    
+    new_user = User(
+        email=user_data.email,
+        full_name=user_data.full_name,
+        password=hashed_password,
+        role=user_data.role or "user"  # par défaut 'user'
+    )
+    
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    return UserInfo(
+        id=new_user.id,
+        email=new_user.email,
+        full_name=new_user.full_name,
+        role=new_user.role,
+        created_at=new_user.created_at.isoformat(),
+        predictions_count=0
+    )
+
+@router.put("/users/{user_id}", response_model=UserInfo)
+def update_user(
+    user_id: str,
+    user_data: UserUpdate = Body(...),
+    admin_user: User = Depends(verify_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Met à jour un utilisateur existant (admin uniquement).
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+
+    # Vérifier si l'email est déjà utilisé par un autre utilisateur
+    if user_data.email and user_data.email != user.email:
+        existing = db.query(User).filter(User.email == user_data.email).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email déjà utilisé")
+
+    # Mise à jour des champs
+    if user_data.email:
+        user.email = user_data.email
+    if user_data.full_name:
+        user.full_name = user_data.full_name
+    if user_data.role:
+        user.role = user_data.role
+    if user_data.password:
+        user.password = hash_password(user_data.password)
+
+    db.commit()
+    db.refresh(user)
+
+    return UserInfo(
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role,
+        created_at=user.created_at.isoformat(),
+        predictions_count=db.query(func.count(Prediction.id))
+                            .filter(Prediction.user_id == user.id)
+                            .scalar()
+    )

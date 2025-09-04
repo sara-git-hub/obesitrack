@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Prédictions récentes{% endblock %}
+
+{% block content %}
+<h1>Prédictions récentes</h1>
+<ul id="predList"></ul>
+
+<script>
+async function loadPredictions() {
+    const res = await fetch("/admin/predictions/recent", {
+        headers: {"Authorization": "Bearer " + localStorage.getItem("access_token")}
+    });
+    const preds = await res.json();
+    const ul = document.getElementById("predList");
+    ul.innerHTML = "";
+    preds.forEach(p => {
+        const li = document.createElement("li");
+        li.textContent = `${p.created_at} - ${p.user_email} → ${p.predicted_class}`;
+        ul.appendChild(li);
+    });
+}
+
+loadPredictions();
+</script>
+{% endblock %}
