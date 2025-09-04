@@ -4,32 +4,19 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Dict, Any
 from ..models import User, Prediction
+from ..schemas import UserInfo, AdminStats
 from ..deps import get_db, get_current_user
 from pydantic import BaseModel
+from fastapi.templating import Jinja2Templates
+
+
+templates = Jinja2Templates(directory="templates")
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
-class UserInfo(BaseModel):
-    id: str
-    email: str
-    full_name: str | None
-    created_at: str
-    predictions_count: int
-
-class AdminStats(BaseModel):
-    total_users: int
-    total_predictions: int
-    predictions_by_class: Dict[str, int]
-    recent_users: int  # derniers 7 jours
-
-# Middleware simple pour vérifier les droits admin (à améliorer)
 def verify_admin(current_user: User = Depends(get_current_user)):
-    """
-    Vérification basique admin - À améliorer avec un système de rôles
-    Pour l'instant, on considère que les utilisateurs avec un email spécifique sont admins
-    """
-    admin_emails = ["admin@obesitrack.com", "sara@admin.com"]  # À configurer
-    if current_user.email not in admin_emails:
+
+    if current_user.role != 'admin':
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Accès admin requis"

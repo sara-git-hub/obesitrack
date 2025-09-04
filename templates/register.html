@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Register{% endblock %}
+
+{% block content %}
+<h1>Inscription</h1>
+<form id="registerForm">
+    <label>Nom complet</label>
+    <input type="text" name="full_name">
+    
+    <label>Email</label>
+    <input type="email" name="email" required>
+    
+    <label>Mot de passe</label>
+    <input type="password" name="password" required>
+    
+    <button type="submit">S'inscrire</button>
+</form>
+
+<div id="message"></div>
+
+<script>
+const form = document.getElementById("registerForm");
+form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    const res = await fetch("/auth/register", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(data)
+    });
+
+    const msgDiv = document.getElementById("message");
+
+    if(res.ok){
+        const result = await res.json();
+        msgDiv.innerHTML = "<div class='alert alert-success'>Inscription réussie ! Connectez-vous.</div>";
+        setTimeout(() => { window.location.href = "/auth/login"; }, 1500);
+    } else {
+        const error = await res.json();
+        msgDiv.innerHTML = `<div class='alert alert-error'>${error.detail}</div>`;
+    }
+});
+</script>
+{% endblock %}

@@ -17,6 +17,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255))
     full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    role: Mapped[str] = mapped_column(String(50), server_default="user", nullable=False)
     created_at: Mapped[str] = mapped_column(server_default=func.now())
 
     predictions: Mapped[list["Prediction"]] = relationship(back_populates="user")

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Historique des prédictions{% endblock %}
+
+{% block content %}
+<h1>Historique de vos prédictions, <span id="username"></span></h1>
+
+<table id="historyTable">
+    <thead>
+        <tr>
+            <th>Classe prédite</th>
+            <th>Probabilités</th>
+            <th>Date</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<script>
+async function loadHistory() {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+        alert("Vous devez être connecté pour voir votre historique.");
+        window.location.href = "/auth/login";
+        return;
+    }
+
+    const res = await fetch("/predict/history/data", {
+        headers: { "Authorization": "Bearer " + token }
+    });
+
+    if(res.ok) {
+        const data = await res.json();
+
+        // Affiche le nom de l'utilisateur
+        document.getElementById("username").textContent = data.user_name;
+
+        const tbody = document.querySelector("#historyTable tbody");
+        tbody.innerHTML = "";
+
+        data.predictions.forEach(p => {
+            let probaHtml = "";
+            if (p.proba) {
+                probaHtml = "<ul>";
+                for (const [k, v] of Object.entries(p.proba)) {
+                    probaHtml += `<li>${k}: ${(v*100).toFixed(2)}%</li>`;
+                }
+                probaHtml += "</ul>";
+            }
+
+            tbody.innerHTML += `
+                <tr>
+                    <td>${p.predicted_class}</td>
+                    <td>${probaHtml}</td>
+                    <td>${new Date(p.created_at).toLocaleString()}</td>
+                </tr>
+            `;
+        });
+    } else {
+        alert("Impossible de charger l'historique.");
+    }
+}
+
+loadHistory();
+</script>
+{% endblock %}

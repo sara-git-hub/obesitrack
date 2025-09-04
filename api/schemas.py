@@ -36,3 +36,16 @@ class PredictionResponse(BaseModel):
     predicted_class: str
     proba: Dict[str, float] | None = None
     id: str | None = None
+
+class UserInfo(BaseModel):
+    id: str
+    email: str
+    full_name: str | None
+    created_at: str
+    predictions_count: int
+
+class AdminStats(BaseModel):
+    total_users: int
+    total_predictions: int
+    predictions_by_class: Dict[str, int]
+    recent_users: int  # derniers 7 jours

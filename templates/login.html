@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<h1>Connexion</h1>
+
+<form id="loginForm">
+    <label>Email</label>
+    <input type="email" name="username" required>
+
+    <label>Mot de passe</label>
+    <input type="password" name="password" required>
+
+    <button type="submit">Se connecter</button>
+</form>
+
+<div id="message"></div>
+
+<script>
+const form = document.getElementById("loginForm");
+
+form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    // Récupérer les données du formulaire
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    try {
+        const res = await fetch("/auth/login", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: new URLSearchParams(data)
+        });
+
+        const msgDiv = document.getElementById("message");
+
+        if (res.ok) {
+            const result = await res.json();
+
+            // Stocker le token côté client
+            localStorage.setItem("access_token", result.access_token);
+
+            msgDiv.innerHTML = "<div class='alert alert-success'>Connexion réussie !</div>";
+
+            // Rediriger vers la page de prédiction
+            setTimeout(() => {
+                window.location.href = "/predict";
+            }, 1000);
+        } else {
+            const error = await res.json();
+            msgDiv.innerHTML = `<div class='alert alert-error'>${error.detail}</div>`;
+        }
+    } catch (err) {
+        console.error(err);
+        document.getElementById("message").innerHTML = `<div class='alert alert-error'>Erreur réseau ou serveur.</div>`;
+    }
+});
+</script>
+{% endblock %}

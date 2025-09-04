@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Admin{% endblock %}
+
+{% block content %}
+<h1>Tableau de bord Admin</h1>
+
+<h2>Utilisateurs</h2>
+<ul id="usersList"></ul>
+
+<h2>Statistiques</h2>
+<pre id="statsContainer"></pre>
+
+<script>
+const token = localStorage.getItem("access_token");
+
+// Charger la liste des utilisateurs
+async function loadUsers(){
+    const res = await fetch("/admin/users", {
+        headers: {"Authorization": "Bearer " + token}
+    });
+    const users = await res.json();
+    const ul = document.getElementById("usersList");
+    ul.innerHTML = "";
+    users.forEach(u => {
+        const li = document.createElement("li");
+        li.innerHTML = `${u.email} - ${u.full_name || ""} - Prédictions: ${u.predictions_count} 
+            <button onclick="deleteUser('${u.id}')">Supprimer</button>
+            <button onclick="viewPredictions('${u.id}')">Voir prédictions</button>`;
+        ul.appendChild(li);
+    });
+}
+
+// Supprimer un utilisateur
+async function deleteUser(userId){
+    if(!confirm("Supprimer cet utilisateur et toutes ses prédictions ?")) return;
+    const res = await fetch(`/admin/users/${userId}`, {
+        method: "DELETE",
+        headers: {"Authorization": "Bearer " + token}
+    });
+    const data = await res.json();
+    alert(data.message || JSON.stringify(data));
+    loadUsers();
+}
+
+// Voir les prédictions d'un utilisateur
+async function viewPredictions(userId){
+    const res = await fetch(`/admin/users/${userId}/predictions`, {
+        headers: {"Authorization": "Bearer " + token}
+    });
+    const data = await res.json();
+    let html = `<h3>Prédictions pour ${data.user.email}</h3><ul>`;
+    data.predictions.forEach(p => {
+        html += `<li>${p.predicted_class} - ${p.created_at}<br>Input: ${JSON.stringify(p.input_data)}</li>`;
+    });
+    html += "</ul>";
+    document.getElementById("statsContainer").innerHTML = html;
+}
+
+// Charger les statistiques globales
+async function loadStats(){
+    const res = await fetch("/admin/stats", {
+        headers: {"Authorization": "Bearer " + token}
+    });
+    const stats = await res.json();
+    document.getElementById("statsContainer").innerHTML = JSON.stringify(stats, null, 2);
+}
+
+// Initialisation
+loadUsers();
+loadStats();
+</script>
+{% endblock %}
