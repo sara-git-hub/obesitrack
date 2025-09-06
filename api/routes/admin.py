@@ -137,7 +137,7 @@ def create_user(
     new_user = User(
         email=user_data.email,
         full_name=user_data.full_name,
-        password=hashed_password,
+        hashed_password=hashed_password,
         role=user_data.role or "user"  # par défaut 'user'
     )
     
@@ -182,7 +182,7 @@ def update_user(
     if user_data.role:
         user.role = user_data.role
     if user_data.password:
-        user.password = hash_password(user_data.password)
+        user.hashed_password = hash_password(user_data.password)
 
     db.commit()
     db.refresh(user)
