@@ -13,19 +13,17 @@ LABEL_MAP = {
     "Obesity_Type_I": 4, "Obesity_Type_II": 5, "Obesity_Type_III": 6,
 }
 
+# Prétraitement des données
 def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     data = df.copy()
-
     # Calcul de l'IMC
     data['IMC']=data['Weight']/(data['Height']**2)
-
     data["NObeyesdad_num"] = data["NObeyesdad"].map(LABEL_MAP)
-
     # --- Colonnes finales ---
     columns_select = ["IMC", "Height", "Weight", "FCVC", "NObeyesdad_num"]
-
     return data[columns_select]
 
+# Entraînement et sauvegarde du modèle
 def best_model(df):
     pipeline=Pipeline([
             ('clf', GradientBoostingClassifier(random_state=42))

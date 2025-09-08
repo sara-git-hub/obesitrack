@@ -7,6 +7,8 @@ from .config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# Fonctions de sécurité : hachage, vérification et création de tokens JWT
+
 def hash_password(password: str) -> str:
     """Hache un mot de passe"""
     return pwd_context.hash(password)

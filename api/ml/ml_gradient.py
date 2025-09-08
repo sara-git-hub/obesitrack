@@ -14,6 +14,7 @@ _label_map = {
     6: "Obesity_Type_III"
 }
 
+# Chargement du modèle ML
 def load_model():
     global _model
     if _model is None:
@@ -25,6 +26,7 @@ def load_model():
             raise
     return _model
 
+# Prétraitement des données
 def preprocess_input(data: dict) -> pd.DataFrame:
     """Préprocess complet pour le modèle GradientBoosting"""
     df = pd.DataFrame([data])
@@ -32,6 +34,7 @@ def preprocess_input(data: dict) -> pd.DataFrame:
     # Colonnes utilisées dans train.py
     return df[["IMC", "Height", "Weight", "FCVC"]]
 
+# Prédiction
 def predict_obesity(payload: dict) -> Tuple[str, Optional[Dict[str, float]]]:
     model = load_model()
     X = preprocess_input(payload)

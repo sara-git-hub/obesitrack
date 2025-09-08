@@ -8,13 +8,30 @@
 </head>
 <body>
 
-    <!-- Navbar simple -->
+    <!-- Navbar dynamique -->
     <div class="navbar">
         <a href="/">Accueil</a>
-        <a href="/auth/login">Login</a>
-        <a href="/auth/register">Register</a>
-        <a href="/predict/history">Mes prédictions</a>
-        <a href="/admin_web/users">Admin</a>
+        
+        <!-- Menu par défaut (sera modifié par JS) -->
+        <div id="nav-guest" class="nav-section">
+            <a href="/auth/login">Connexion</a>
+            <a href="/auth/register">Inscription</a>
+        </div>
+        
+        <div id="nav-user" class="nav-section" style="display: none;">
+            <a href="/predict">Nouvelle prédiction</a>
+            <a href="/predict/history">Mes prédictions</a>
+            <span id="user-info" class="user-info"></span>
+            <a href="#" onclick="logout()" class="logout-btn">Déconnexion</a>
+        </div>
+        
+        <div id="nav-admin" class="nav-section" style="display: none;">
+            <a href="/admin_web/dashboard">Dashboard</a>
+            <a href="/admin_web/users">Gestion utilisateurs</a>
+            <a href="/admin_web/predictions/recent">Toutes les prédictions</a>
+            <span id="admin-info" class="user-info"></span>
+            <a href="#" onclick="logout()" class="logout-btn">Déconnexion</a>
+        </div>
     </div>
 
     <!-- Conteneur principal -->
@@ -22,6 +39,125 @@
         {% block content %}
         {% endblock %}
     </div>
+
+    <!-- Script pour gérer la navbar dynamique -->
+    <script>
+        // Fonction pour décoder le JWT (partie payload)
+        function parseJwt(token) {
+            try {
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                return JSON.parse(jsonPayload);
+            } catch (error) {
+                return null;
+            }
+        }
+
+        // Fonction pour vérifier et afficher la navbar appropriée
+        async function updateNavbar() {
+            console.log('🔍 Mise à jour de la navbar...');
+            const token = localStorage.getItem('access_token');
+            console.log('🔑 Token trouvé:', token ? 'OUI' : 'NON');
+            
+            if (!token) {
+                // Pas de token = utilisateur non connecté
+                console.log('👤 Affichage navbar invité');
+                showGuestNav();
+                return;
+            }
+
+            // Vérifier si le token est expiré
+            const payload = parseJwt(token);
+            if (!payload || payload.exp < Date.now() / 1000) {
+                // Token expiré
+                console.log('⏰ Token expiré');
+                localStorage.removeItem('access_token');
+                showGuestNav();
+                return;
+            }
+            console.log('✅ Token valide, récupération des infos...');
+
+            // Token valide, récupérer les infos utilisateur
+            try {
+                const response = await fetch('/auth/me', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const user = await response.json();
+                    console.log('👤 Utilisateur récupéré:', user);
+                    showUserNav(user);
+                } else {
+                    // Token invalide côté serveur
+                    console.log('❌ Erreur serveur:', response.status);
+                    localStorage.removeItem('access_token');
+                    showGuestNav();
+                }
+            } catch (error) {
+                console.error('❌ Erreur lors de la récupération des infos utilisateur:', error);
+                showGuestNav();
+            }
+        }
+
+        function showGuestNav() {
+            console.log('👤 Affichage navbar invité');
+            const navGuest = document.getElementById('nav-guest');
+            const navUser = document.getElementById('nav-user');
+            const navAdmin = document.getElementById('nav-admin');
+            
+            console.log('Elements trouvés:', {
+                guest: navGuest ? 'OUI' : 'NON',
+                user: navUser ? 'OUI' : 'NON', 
+                admin: navAdmin ? 'OUI' : 'NON'
+            });
+            
+            if (navGuest) navGuest.style.display = 'block';
+            if (navUser) navUser.style.display = 'none';
+            if (navAdmin) navAdmin.style.display = 'none';
+        }
+
+        function showUserNav(user) {
+            console.log('🔄 Affichage navbar pour:', user.role);
+            const navGuest = document.getElementById('nav-guest');
+            const navUser = document.getElementById('nav-user');
+            const navAdmin = document.getElementById('nav-admin');
+            const userInfo = document.getElementById('user-info');
+            const adminInfo = document.getElementById('admin-info');
+            
+            console.log('Elements trouvés:', {
+                guest: navGuest ? 'OUI' : 'NON',
+                user: navUser ? 'OUI' : 'NON', 
+                admin: navAdmin ? 'OUI' : 'NON'
+            });
+            
+            if (navGuest) navGuest.style.display = 'none';
+            
+            if (user.role === 'admin') {
+                if (navUser) navUser.style.display = 'none';
+                if (navAdmin) navAdmin.style.display = 'block';
+                if (adminInfo) adminInfo.textContent = `Admin: ${user.email}`;
+                console.log('👑 Navbar admin affichée');
+            } else {
+                if (navUser) navUser.style.display = 'block';
+                if (navAdmin) navAdmin.style.display = 'none';
+                if (userInfo) userInfo.textContent = user.email;
+                console.log('👤 Navbar utilisateur affichée');
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('access_token');
+            window.location.href = '/';
+        }
+
+        // Mettre à jour la navbar au chargement de la page
+        document.addEventListener('DOMContentLoaded', updateNavbar);
+    </script>
 
 </body>
 </html>

@@ -5,12 +5,11 @@ from ..schemas import PredictionRequest, PredictionResponse
 from ..models import User, Prediction
 from ..deps import get_db, get_current_user
 from ..ml.ml_gradient import predict_obesity
-from fastapi.templating import Jinja2Templates
-
-templates = Jinja2Templates(directory="templates")
+from ..core.templates import templates
 
 router = APIRouter(prefix="/predict", tags=["predictions"])
 
+# Envoie le formulaire de prediction
 @router.post("/", response_model=PredictionResponse)
 def make_prediction(prediction_request: PredictionRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     input_data = prediction_request.model_dump()
@@ -21,6 +20,7 @@ def make_prediction(prediction_request: PredictionRequest, current_user: User = 
     db.refresh(record)
     return PredictionResponse(id=record.id, predicted_class=predicted_class, proba=probabilities)
 
+# Supprime une prediction
 @router.delete("/history/{prediction_id}")
 def delete_prediction(prediction_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     pred = db.query(Prediction).filter(Prediction.id == prediction_id, Prediction.user_id == current_user.id).first()
@@ -30,7 +30,7 @@ def delete_prediction(prediction_id: str, current_user: User = Depends(get_curre
     db.commit()
     return {"message": "Prédiction supprimée avec succès"}
 
-
+# Retourne l'historique des predictions
 @router.get("/history/data")
 def get_predictions(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """

@@ -3,15 +3,15 @@ from sqlalchemy import String, Text, JSON, ForeignKey, func,DateTime
 import uuid
 from datetime import datetime
 
-
+# Base de données
 class Base(DeclarativeBase):
     pass
 
-
+# Génère un UUID4 sous forme de chaîne
 def uuid4_str():
     return str(uuid.uuid4())
 
-
+#Classe User
 class User(Base):
     __tablename__ = "users"
     id: Mapped[str] = mapped_column(String, primary_key=True, default=uuid4_str)
@@ -23,7 +23,7 @@ class User(Base):
 
     predictions: Mapped[list["Prediction"]] = relationship(back_populates="user")
 
-
+# Classe Prediction
 class Prediction(Base):
     __tablename__ = "predictions"
     id: Mapped[str] = mapped_column(String, primary_key=True, default=uuid4_str)

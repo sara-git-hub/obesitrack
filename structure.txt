@@ -9,8 +9,11 @@ obesitrack/
 │   └── routes/            # Routes de l'API
 │       ├── auth.py        # Authentification
 │       ├── predictions.py # Prédictions
-│       ├── web.py
+│       ├── web.py         # Pages web
+│       ├── admin_web.py   # Pages web admin
 │       └── admin.py       # Administration
+├── core/                 
+│   └── templates.py       # Initialiser Jinja2
 ├── ml/                    # Modèle de Machine Learning
 │   ├── train.py          # Script d'entraînement
 │   ├── data/             # Données d'entraînement
@@ -20,15 +23,17 @@ obesitrack/
 │   └── js/  
 │       └── app.js
 |── templates/
-│   ├── admin.html           
+│   ├── users.html           
 │   ├── base.html
 │   ├── history.html
 │   ├── index.html 
 │   ├── login.html 
-│   ├── prediction.html          
+│   ├── prediction.html  
+│   ├── predictions.html     
+│   ├── recent_predictions.html      
 │   └── register.html 
 ├── tests/                # Tests unitaires
 ├── docker-compose.yml    # Configuration Docker Compose
-├── Dockerfile           # Image Docker de l'application
-├── requirements.txt     # Dépendances Python
-└── README.md           # Ce fichier
+├── Dockerfile            # Image Docker de l'application
+├── requirements.txt      # Dépendances Python
+└── README.md             # Ce fichier

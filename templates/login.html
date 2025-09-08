@@ -45,9 +45,9 @@ form.addEventListener("submit", async (e) => {
 
             msgDiv.innerHTML = "<div class='alert alert-success'>Connexion réussie !</div>";
 
-            // Rediriger vers la page de prédiction
+            // Rediriger vers la page d'accueil
             setTimeout(() => {
-                window.location.href = "/predict";
+                window.location.href = "/";
             }, 1000);
         } else {
             const error = await res.json();

@@ -1,17 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
-from fastapi.templating import Jinja2Templates
 
 from ..schemas import UserCreate, Token
 from ..models import User
 from ..deps import get_db,get_current_user
 from ..security import hash_password, verify_password, create_access_token
 from ..config import settings
-
-templates = Jinja2Templates(directory="templates")
+from ..core.templates import templates
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -45,7 +42,6 @@ def read_current_user(current_user: User = Depends(get_current_user)):
         "id": current_user.id,
         "email": current_user.email,
         "full_name": current_user.full_name,
+        "role": current_user.role,  # Ajouter cette ligne
         "created_at": current_user.created_at
     }
-
-

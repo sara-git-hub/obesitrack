@@ -1,3 +1,4 @@
+
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
@@ -6,9 +7,9 @@ from fastapi.templating import Jinja2Templates
 
 from ..deps import get_current_user, get_db
 from ..models import User, Prediction
+from ..core.templates import templates
 
 router = APIRouter(tags=["web"])
-templates = Jinja2Templates(directory="templates")
 
 # ==============================
 #  Page d'accueil
@@ -44,4 +45,3 @@ def prediction_form(request: Request):
 def predictions_page(request: Request):
     # Pas de current_user ici
     return templates.TemplateResponse("predictions.html", {"request": request})
-

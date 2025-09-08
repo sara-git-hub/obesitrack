@@ -5,13 +5,12 @@ import json
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from sqlalchemy import text
-from fastapi.templating import Jinja2Templates
-
 
 from .config import settings
 from .deps import get_db, engine
 from .models import Base
 from .routes import auth, predictions, admin,web,admin_web
+from .core.templates import templates
 
 # App FastAPI
 app = FastAPI(
@@ -20,13 +19,15 @@ app = FastAPI(
     description="API de prédiction et gestion utilisateurs pour l'obésité"
 )
 
+
 # Création des tables
 Base.metadata.create_all(bind=engine)
 
 # Fichiers statiques
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-templates = Jinja2Templates(directory="templates")
+
+
 
 # Routes
 app.include_router(auth.router)
