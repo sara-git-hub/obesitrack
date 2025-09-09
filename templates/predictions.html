@@ -11,12 +11,19 @@
             <th>Classe prédite</th>
             <th>Probabilités</th>
             <th>Date</th>
+            <th>Actions</th>
         </tr>
     </thead>
     <tbody></tbody>
 </table>
 
 <script>
+// Couleurs pour les graphiques
+const chartColors = [
+    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', 
+    '#9966FF', '#FF9F40', '#8C9EFF', '#FF6D00'
+];
+
 async function loadHistory() {
     const token = localStorage.getItem("access_token");
     if (!token) {
@@ -38,29 +45,283 @@ async function loadHistory() {
         const tbody = document.querySelector("#historyTable tbody");
         tbody.innerHTML = "";
 
-        data.predictions.forEach(p => {
-            let probaHtml = "";
-            if (p.proba) {
-                probaHtml = "<ul>";
-                for (const [k, v] of Object.entries(p.proba)) {
-                    probaHtml += `<li>${k}: ${(v*100).toFixed(2)}%</li>`;
-                }
-                probaHtml += "</ul>";
-            }
-
-            tbody.innerHTML += `
-                <tr>
-                    <td>${p.predicted_class}</td>
-                    <td>${probaHtml}</td>
-                    <td>${new Date(p.created_at).toLocaleString()}</td>
-                </tr>
+        data.predictions.forEach((p, index) => {
+            const row = document.createElement('tr');
+            
+            // Créer un conteneur pour le graphique
+            const chartContainer = document.createElement('div');
+            chartContainer.className = 'chart-container';
+            chartContainer.style.width = '200px';
+            chartContainer.style.height = '100px';
+            chartContainer.innerHTML = `<canvas id="chart-${index}"></canvas>`;
+            
+            row.innerHTML = `
+                <td>
+                    <span class="prediction-badge">${p.predicted_class}</span>
+                </td>
+                <td>
+                    <div class="probability-display">
+                        <div class="chart-container" id="chart-container-${index}"></div>
+                        <div class="probability-details">
+                            ${generateProbabilityDetails(p.proba)}
+                        </div>
+                    </div>
+                </td>
+                <td>${new Date(p.created_at).toLocaleString()}</td>
+                <td>
+                    <button onclick="toggleChartView(${index})" class="btn-view">
+                        📊
+                    </button>
+                </td>
             `;
+            
+            tbody.appendChild(row);
+            
+            // Créer le graphique après l'insertion dans le DOM
+            if (p.proba) {
+                setTimeout(() => createProbabilityChart(index, p.proba, p.predicted_class), 100);
+            }
         });
     } else {
         alert("Impossible de charger l'historique.");
     }
 }
 
+// Créer un graphique en barres pour les probabilités
+function createProbabilityChart(index, proba, predictedClass) {
+    const ctx = document.getElementById(`chart-${index}`);
+    if (!ctx) return;
+    
+    const labels = Object.keys(proba);
+    const data = Object.values(proba).map(v => v * 100);
+    const backgroundColors = labels.map((label, i) => 
+        label === predictedClass ? '#FF6384' : chartColors[i % chartColors.length]
+    );
+    
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: backgroundColors,
+                borderWidth: 1,
+                barPercentage: 0.6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        },
+                        font: {
+                            size: 8
+                        }
+                    }
+                },
+                y: {
+                    ticks: {
+                        font: {
+                            size: 9
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.label}: ${context.raw.toFixed(1)}%`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Générer les détails textuels des probabilités
+function generateProbabilityDetails(proba) {
+    if (!proba) return '<span class="no-data">Aucune donnée de probabilité</span>';
+    
+    let html = '<div class="probability-list">';
+    for (const [k, v] of Object.entries(proba)) {
+        const percentage = (v * 100).toFixed(1);
+        html += `
+            <div class="probability-item">
+                <span class="class-name">${k}:</span>
+                <span class="percentage">${percentage}%</span>
+                <div class="probability-bar">
+                    <div class="probability-fill" style="width: ${percentage}%"></div>
+                </div>
+            </div>
+        `;
+    }
+    html += '</div>';
+    return html;
+}
+
+// Basculer entre la vue graphique et textuelle
+function toggleChartView(index) {
+    const container = document.getElementById(`chart-container-${index}`);
+    const details = container.nextElementSibling;
+    
+    if (container.style.display === 'none') {
+        container.style.display = 'block';
+        details.style.display = 'none';
+    } else {
+        container.style.display = 'none';
+        details.style.display = 'block';
+    }
+}
+
+// Chargement initial
 loadHistory();
 </script>
+
+<style>
+.prediction-badge {
+    background: #e9ecef;
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-weight: 600;
+    font-size: 14px;
+    color: #495057;
+}
+
+.probability-display {
+    display: flex;
+    gap: 15px;
+    align-items: flex-start;
+}
+
+.chart-container {
+    min-width: 200px;
+    height: 120px;
+    position: relative;
+}
+
+.probability-details {
+    flex: 1;
+    min-width: 150px;
+}
+
+.probability-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.probability-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.class-name {
+    font-weight: 600;
+    min-width: 60px;
+    color: #495057;
+}
+
+.percentage {
+    font-weight: 500;
+    min-width: 40px;
+    color: #6c757d;
+}
+
+.probability-bar {
+    flex: 1;
+    height: 6px;
+    background: #e9ecef;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.probability-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #36A2EB, #4BC0C0);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.no-data {
+    color: #6c757d;
+    font-style: italic;
+    font-size: 12px;
+}
+
+.btn-view {
+    background: none;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.btn-view:hover {
+    background: #f8f9fa;
+}
+
+#historyTable {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+#historyTable th {
+    background: #f8f9fa;
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #495057;
+    border-bottom: 2px solid #e9ecef;
+}
+
+#historyTable td {
+    padding: 12px;
+    border-bottom: 1px solid #e9ecef;
+    vertical-align: top;
+}
+
+#historyTable tr:hover {
+    background: #f8f9fa;
+}
+
+@media (max-width: 768px) {
+    .probability-display {
+        flex-direction: column;
+    }
+    
+    .chart-container {
+        width: 100% !important;
+        height: 100px;
+    }
+    
+    #historyTable {
+        font-size: 14px;
+    }
+    
+    #historyTable th,
+    #historyTable td {
+        padding: 8px;
+    }
+}
+</style>
 {% endblock %}

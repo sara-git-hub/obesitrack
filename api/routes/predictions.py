@@ -20,16 +20,6 @@ def make_prediction(prediction_request: PredictionRequest, current_user: User = 
     db.refresh(record)
     return PredictionResponse(id=record.id, predicted_class=predicted_class, proba=probabilities)
 
-# Supprime une prediction
-@router.delete("/history/{prediction_id}")
-def delete_prediction(prediction_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    pred = db.query(Prediction).filter(Prediction.id == prediction_id, Prediction.user_id == current_user.id).first()
-    if not pred:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prédiction non trouvée")
-    db.delete(pred)
-    db.commit()
-    return {"message": "Prédiction supprimée avec succès"}
-
 # Retourne l'historique des predictions
 @router.get("/history/data")
 def get_predictions(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):

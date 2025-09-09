@@ -154,46 +154,50 @@ def create_user(
         predictions_count=0
     )
 
-@router.put("/users/{user_id}", response_model=UserInfo)
-def update_user(
-    user_id: str,
-    user_data: UserUpdate = Body(...),
-    admin_user: User = Depends(verify_admin),
-    db: Session = Depends(get_db)
-):
-    """
-    Met à jour un utilisateur existant (admin uniquement).
-    """
+@router.get("/users/{user_id}/predictions")
+def get_user_predictions_admin(user_id: str, limit: int = 50,
+                               admin_user: User = Depends(verify_admin),
+                               db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    
+    predictions = db.query(Prediction)\
+        .filter(Prediction.user_id == user_id)\
+        .order_by(Prediction.created_at.desc())\
+        .limit(limit).all()
+    
+    return {
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "full_name": user.full_name
+        },
+        "predictions": [
+            {
+                "id": p.id,
+                "predicted_class": p.predicted_class,
+                "proba": p.proba,  # ← Assurez-vous que ce champ existe
+                "created_at": p.created_at.isoformat(),
+                "input_data": p.payload_json
+            } for p in predictions
+        ]
+    }
 
-    # Vérifier si l'email est déjà utilisé par un autre utilisateur
-    if user_data.email and user_data.email != user.email:
-        existing = db.query(User).filter(User.email == user_data.email).first()
-        if existing:
-            raise HTTPException(status_code=400, detail="Email déjà utilisé")
-
-    # Mise à jour des champs
-    if user_data.email:
-        user.email = user_data.email
-    if user_data.full_name:
-        user.full_name = user_data.full_name
-    if user_data.role:
-        user.role = user_data.role
-    if user_data.password:
-        user.hashed_password = hash_password(user_data.password)
-
+@router.delete("/predictions/{prediction_id}")
+def delete_prediction(
+    prediction_id: str, 
+    admin_user: User = Depends(verify_admin), 
+    db: Session = Depends(get_db)
+):
+    """
+    Supprime une prédiction spécifique (admin uniquement)
+    """
+    prediction = db.query(Prediction).filter(Prediction.id == prediction_id).first()
+    if not prediction:
+        raise HTTPException(status_code=404, detail="Prédiction non trouvée")
+    
+    db.delete(prediction)
     db.commit()
-    db.refresh(user)
-
-    return UserInfo(
-        id=user.id,
-        email=user.email,
-        full_name=user.full_name,
-        role=user.role,
-        created_at=user.created_at.isoformat(),
-        predictions_count=db.query(func.count(Prediction.id))
-                            .filter(Prediction.user_id == user.id)
-                            .scalar()
-    )
+    
+    return {"message": f"Prédiction {prediction_id} supprimée avec succès"}

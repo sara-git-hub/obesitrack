@@ -1,25 +1,415 @@
 {% extends "base.html" %}
-{% block title %}Prédictions récentes{% endblock %}
+{% block title %}Gestion des prédictions - Admin{% endblock %}
 
 {% block content %}
-<h1>Prédictions récentes</h1>
-<ul id="predList"></ul>
+<div class="admin-header">
+    <h1>📊 Gestion des prédictions</h1>
+    <div class="header-actions">
+        <button onclick="loadPredictions()" class="btn-refresh">🔄 Actualiser</button>
+        <div class="filter-controls">
+            <input type="number" id="limitInput" value="50" min="1" max="1000" 
+                   onchange="loadPredictions()" placeholder="Nombre de résultats">
+        </div>
+    </div>
+</div>
 
+<div class="tabs">
+    <button class="tab-btn active" onclick="showTab('recent')">📋 Prédictions récentes</button>
+    <button class="tab-btn" onclick="showTab('users')">👥 Par utilisateur</button>
+</div>
+
+<!-- Tab 1: Prédictions récentes -->
+<div id="tab-recent" class="tab-content active">
+    <div class="table-container">
+        <table class="predictions-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Utilisateur</th>
+                    <th>Classe prédite</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="predictionsTable"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Tab 2: Par utilisateur -->
+<div id="tab-users" class="tab-content">
+    <div class="user-selection">
+        <select id="userSelect" onchange="loadUserPredictions()">
+            <option value="">Sélectionner un utilisateur...</option>
+        </select>
+    </div>
+    <div id="userPredictions" class="user-predictions-container" style="display: none;">
+        <h3 id="userTitle"></h3>
+        <div class="table-container">
+            <table class="predictions-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Classe prédite</th>
+                        <th>Probabilité</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="userPredictionsTable"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', path='/js/chart.js') }}"></script>
 <script>
-async function loadPredictions() {
-    const res = await fetch("/admin/predictions/recent", {
-        headers: {"Authorization": "Bearer " + localStorage.getItem("access_token")}
+let allUsers = [];
+let currentTab = 'recent';
+
+// Chargement initial
+document.addEventListener('DOMContentLoaded', function() {
+    loadUsers();
+    loadPredictions();
+});
+
+// Gestion des onglets
+function showTab(tabName) {
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
     });
-    const preds = await res.json();
-    const ul = document.getElementById("predList");
-    ul.innerHTML = "";
-    preds.forEach(p => {
-        const li = document.createElement("li");
-        li.textContent = `${p.created_at} - ${p.user_email} → ${p.predicted_class}`;
-        ul.appendChild(li);
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
     });
+    
+    document.getElementById(`tab-${tabName}`).classList.add('active');
+    document.querySelector(`.tab-btn[onclick="showTab('${tabName}')"]`).classList.add('active');
+    
+    currentTab = tabName;
 }
 
-loadPredictions();
+// Charger la liste des utilisateurs
+async function loadUsers() {
+    try {
+        const res = await fetch("/admin/users?limit=1000", {
+            headers: {"Authorization": "Bearer " + localStorage.getItem("access_token")}
+        });
+        allUsers = await res.json();
+        
+        const select = document.getElementById('userSelect');
+        select.innerHTML = '<option value="">Sélectionner un utilisateur...</option>';
+        
+        allUsers.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.id;
+            option.textContent = `${user.email} (${user.full_name}) - ${user.predictions_count} prédictions`;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Erreur chargement utilisateurs:', error);
+        alert('Erreur lors du chargement des utilisateurs');
+    }
+}
+
+// Charger les prédictions récentes
+async function loadPredictions() {
+    try {
+        const limit = document.getElementById('limitInput').value || 50;
+        const res = await fetch(`/admin/predictions/recent?limit=${limit}`, {
+            headers: {"Authorization": "Bearer " + localStorage.getItem("access_token")}
+        });
+        const preds = await res.json();
+        
+        const tbody = document.getElementById('predictionsTable');
+        tbody.innerHTML = '';
+        
+        preds.forEach(p => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${formatDate(p.created_at)}</td>
+                <td>${p.user_email}</td>
+                <td><span class="prediction-badge">${p.predicted_class}</span></td>
+                <td>
+                    <button onclick="deletePrediction('${p.id}', this)" 
+                            class="btn-delete" title="Supprimer">
+                        🗑️
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    } catch (error) {
+        console.error('Erreur chargement prédictions:', error);
+        alert('Erreur lors du chargement des prédictions');
+    }
+}
+
+// Charger les prédictions d'un utilisateur spécifique
+async function loadUserPredictions() {
+    const userId = document.getElementById('userSelect').value;
+    if (!userId) {
+        document.getElementById('userPredictions').style.display = 'none';
+        return;
+    }
+    
+    try {
+        const res = await fetch(`/admin/users/${userId}/predictions?limit=1000`, {
+            headers: {"Authorization": "Bearer " + localStorage.getItem("access_token")}
+        });
+        
+        if (!res.ok) {
+            throw new Error(`Erreur HTTP: ${res.status}`);
+        }
+        
+        const data = await res.json();
+        const user = data.user;
+        const predictions = data.predictions;
+        
+        document.getElementById('userTitle').textContent = 
+            `Prédictions de ${user.email} (${user.full_name}) - ${predictions.length} prédictions`;
+        
+        const tbody = document.getElementById('userPredictionsTable');
+        tbody.innerHTML = '';
+        
+        predictions.forEach(p => {
+            const row = document.createElement('tr');
+            
+            // Gestion des probabilités
+            let probabilityDisplay = 'N/A';
+            if (p.proba) {
+                // Si proba est un objet {classe: valeur}
+                if (typeof p.proba === 'object' && p.proba !== null) {
+                    const predictedValue = p.proba[p.predicted_class];
+                    probabilityDisplay = predictedValue ? (predictedValue * 100).toFixed(1) + '%' : 'N/A';
+                } 
+                // Si proba est directement un nombre
+                else if (typeof p.proba === 'number') {
+                    probabilityDisplay = (p.proba * 100).toFixed(1) + '%';
+                }
+            }
+            
+            row.innerHTML = `
+                <td>${formatDate(p.created_at)}</td>
+                <td><span class="prediction-badge">${p.predicted_class}</span></td>
+                <td>${probabilityDisplay}</td>
+                <td>
+                    <button onclick="deletePrediction('${p.id}', this)" 
+                            class="btn-delete" title="Supprimer">
+                        🗑️
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+        
+        document.getElementById('userPredictions').style.display = 'block';
+    } catch (error) {
+        console.error('Erreur chargement prédictions utilisateur:', error);
+        alert('Erreur lors du chargement des prédictions utilisateur: ' + error.message);
+    }
+}
+
+// Supprimer une prédiction
+async function deletePrediction(predictionId, button) {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette prédiction ?')) {
+        return;
+    }
+    
+    try {
+        button.disabled = true;
+        button.textContent = '⏳';
+        
+        const res = await fetch(`/admin/predictions/${predictionId}`, {
+            method: 'DELETE',
+            headers: {"Authorization": "Bearer " + localStorage.getItem("access_token")}
+        });
+        
+        if (res.ok) {
+            // Recharger les données actuelles
+            if (currentTab === 'recent') {
+                loadPredictions();
+            } else {
+                loadUserPredictions();
+            }
+            alert('Prédiction supprimée avec succès');
+        } else {
+            throw new Error('Erreur lors de la suppression');
+        }
+    } catch (error) {
+        console.error('Erreur suppression:', error);
+        alert('Erreur lors de la suppression');
+        button.disabled = false;
+        button.textContent = '🗑️';
+    }
+}
+
+// Formatage de la date
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleString('fr-FR');
+}
+
+// Rechargement automatique
+setInterval(() => {
+    if (currentTab === 'recent') {
+        loadPredictions();
+    }
+}, 30000); // Toutes les 30 secondes
 </script>
+
+<style>
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.header-actions {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.filter-controls input {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    width: 80px;
+}
+
+.tabs {
+    display: flex;
+    border-bottom: 2px solid #e9ecef;
+    margin-bottom: 20px;
+}
+
+.tab-btn {
+    padding: 12px 20px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-weight: 500;
+    color: #6c757d;
+    border-bottom: 3px solid transparent;
+}
+
+.tab-btn.active {
+    color: #0d6efd;
+    border-bottom-color: #0d6efd;
+}
+
+.tab-btn:hover {
+    color: #0d6efd;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.user-selection {
+    margin-bottom: 20px;
+}
+
+.user-selection select {
+    padding: 10px 15px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    width: 100%;
+    max-width: 400px;
+}
+
+.table-container {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.predictions-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.predictions-table th {
+    background: #f8f9fa;
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #495057;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.predictions-table td {
+    padding: 12px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.predictions-table tr:hover {
+    background: #f8f9fa;
+}
+
+.prediction-badge {
+    background: #e9ecef;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.btn-refresh, .btn-delete {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.btn-refresh {
+    background: #0d6efd;
+    color: white;
+}
+
+.btn-refresh:hover {
+    background: #0b5ed7;
+}
+
+.btn-delete {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-delete:hover {
+    background: #bb2d3b;
+}
+
+.user-predictions-container {
+    margin-top: 20px;
+}
+
+@media (max-width: 768px) {
+    .admin-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .header-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .predictions-table {
+        font-size: 14px;
+    }
+    
+    .predictions-table th,
+    .predictions-table td {
+        padding: 8px;
+    }
+}
+</style>
 {% endblock %}

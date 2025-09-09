@@ -8,29 +8,439 @@
   <p>Total utilisateurs : <span id="totalUsers"></span></p>
   <p>Total prédictions : <span id="totalPredictions"></span></p>
   <p>Utilisateurs récents (7j) : <span id="recentUsers"></span></p>
-  <h3>Répartition des prédictions par classe :</h3>
-  <ul id="predByClass"></ul>
 </div>
 
+<!-- Section des graphiques -->
+<div class="charts-container">
+    
+    <!-- Graphique 1: Répartition des prédictions (Pie Chart) -->
+    <div class="chart-card">
+        <h3>Répartition des prédictions par classe</h3>
+        <canvas id="classDistributionChart" height="250"></canvas>
+    </div>
+
+    <!-- Graphique 2: Diagramme en barres des classes -->
+    <div class="chart-card">
+        <h3>Nombre de prédictions par classe</h3>
+        <canvas id="classBarChart" height="250"></canvas>
+    </div>
+
+    <!-- Graphique 3: Graphique circulaire des utilisateurs -->
+    <div class="chart-card">
+        <h3>Répartition des activités</h3>
+        <canvas id="activityPieChart" height="250"></canvas>
+    </div>
+
+    <!-- Graphique 4: Graphique de comparaison -->
+    <div class="chart-card">
+        <h3>Comparaison globale</h3>
+        <canvas id="comparisonChart" height="250"></canvas>
+    </div>
+
+</div>
+
+<script src="{{ url_for('static', path='/js/chart.js') }}"></script>
 <script>
+// Couleurs pour les graphiques
+const chartColors = [
+    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', 
+    '#9966FF', '#FF9F40', '#8C9EFF', '#FF6D00'
+];
+
+// Plugin pour afficher les étiquettes de données
+const dataLabelsPlugin = {
+    id: 'dataLabels',
+    afterDraw: function(chart) {
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#fff';
+        
+        chart.data.datasets.forEach((dataset, i) => {
+            chart.getDatasetMeta(i).data.forEach((element, index) => {
+                const value = dataset.data[index];
+                if (value > 0) { // N'affiche que les valeurs positives
+                    ctx.fillText(value, element.x, element.y);
+                }
+            });
+        });
+        ctx.restore();
+    }
+};
+
 async function loadStats() {
     const res = await fetch("/admin/stats", {
         headers: {"Authorization": "Bearer " + localStorage.getItem("access_token")}
     });
     const stats = await res.json();
+    
+    // Mise à jour des statistiques de base
     document.getElementById("totalUsers").textContent = stats.total_users;
     document.getElementById("totalPredictions").textContent = stats.total_predictions;
     document.getElementById("recentUsers").textContent = stats.recent_users;
 
-    const ul = document.getElementById("predByClass");
-    ul.innerHTML = "";
-    for (const cls in stats.predictions_by_class) {
-        const li = document.createElement("li");
-        li.textContent = `${cls}: ${stats.predictions_by_class[cls]}`;
-        ul.appendChild(li);
+    // Création des graphiques avec les données existantes
+    createClassDistributionChart(stats.predictions_by_class);
+    createClassBarChart(stats.predictions_by_class);
+    createActivityPieChart(stats);
+    createComparisonChart(stats);
+}
+
+// 1. Graphique circulaire pour la répartition des classes
+function createClassDistributionChart(classData) {
+    const ctx = document.getElementById('classDistributionChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'pie',
+        plugins: [dataLabelsPlugin],
+        data: {
+            labels: Object.keys(classData),
+            datasets: [{
+                data: Object.values(classData),
+                backgroundColor: chartColors,
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        font: {
+                            size: 10
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.raw || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// 2. Graphique à barres pour les classes
+function createClassBarChart(classData) {
+    const ctx = document.getElementById('classBarChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(classData),
+            datasets: [{
+                label: 'Nombre de prédictions',
+                data: Object.values(classData),
+                backgroundColor: '#36A2EB',
+                borderWidth: 1,
+                barPercentage: 0.6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        font: {
+                            size: 10
+                        }
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: {
+                            size: 10
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: ${context.raw}`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// 3. Graphique circulaire pour l'activité globale
+function createActivityPieChart(stats) {
+    const ctx = document.getElementById('activityPieChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        plugins: [dataLabelsPlugin],
+        data: {
+            labels: ['Utilisateurs totaux', 'Prédictions totales', 'Nouveaux utilisateurs (7j)'],
+            datasets: [{
+                data: [
+                    stats.total_users,
+                    stats.total_predictions,
+                    stats.recent_users
+                ],
+                backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56'],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        font: {
+                            size: 10
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.raw || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// 4. Graphique de comparaison
+function createComparisonChart(stats) {
+    const ctx = document.getElementById('comparisonChart').getContext('2d');
+    
+    // Calcul du ratio prédictions/utilisateurs
+    const predictionsPerUser = stats.total_users > 0 
+        ? (stats.total_predictions / stats.total_users).toFixed(2) 
+        : 0;
+    
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Métriques globales'],
+            datasets: [
+                {
+                    label: 'Utilisateurs totaux',
+                    data: [stats.total_users],
+                    backgroundColor: '#FF6384'
+                },
+                {
+                    label: 'Prédictions totales',
+                    data: [stats.total_predictions],
+                    backgroundColor: '#36A2EB'
+                },
+                {
+                    label: 'Ratio Prédictions/Utilisateur',
+                    data: [predictionsPerUser],
+                    backgroundColor: '#4BC0C0',
+                    type: 'line',
+                    yAxisID: 'y1',
+                    fill: false,
+                    tension: 0.4,
+                    pointStyle: 'circle',
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        font: {
+                            size: 10
+                        },
+                        callback: function(value) {
+                            return value.toLocaleString();
+                        }
+                    }
+                },
+                y1: {
+                    beginAtZero: true,
+                    position: 'right',
+                    grid: {
+                        drawOnChartArea: false
+                    },
+                    ticks: {
+                        font: {
+                            size: 10
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    labels: {
+                        font: {
+                            size: 10
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            let value = context.raw;
+                            if (label.includes('Ratio')) {
+                                return `${label}: ${value}`;
+                            }
+                            return `${label}: ${value.toLocaleString()}`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Fonction pour ajouter les étiquettes sur les barres
+function addBarLabels(chartId) {
+    const chart = Chart.getChart(chartId);
+    if (chart) {
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillStyle = '#333';
+        
+        chart.data.datasets.forEach((dataset, datasetIndex) => {
+            const meta = chart.getDatasetMeta(datasetIndex);
+            meta.data.forEach((element, index) => {
+                const value = dataset.data[index];
+                if (value > 0) {
+                    ctx.fillText(value, element.x, element.y - 5);
+                }
+            });
+        });
+        ctx.restore();
     }
 }
 
+// Modifier le chargement pour ajouter les étiquettes après le rendu
+async function loadStats() {
+    const res = await fetch("/admin/stats", {
+        headers: {"Authorization": "Bearer " + localStorage.getItem("access_token")}
+    });
+    const stats = await res.json();
+    
+    document.getElementById("totalUsers").textContent = stats.total_users.toLocaleString();
+    document.getElementById("totalPredictions").textContent = stats.total_predictions.toLocaleString();
+    document.getElementById("recentUsers").textContent = stats.recent_users.toLocaleString();
+
+    createClassDistributionChart(stats.predictions_by_class);
+    createClassBarChart(stats.predictions_by_class);
+    createActivityPieChart(stats);
+    createComparisonChart(stats);
+    
+    // Ajouter les étiquettes après un petit délai
+    setTimeout(() => {
+        addBarLabels('classBarChart');
+        addBarLabels('comparisonChart');
+    }, 100);
+}
+
+// Chargement initial
 loadStats();
+
+// Rechargement automatique toutes les 5 minutes
+setInterval(loadStats, 300000);
 </script>
+
+<style>
+.charts-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.chart-card {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin-bottom: 15px;
+    height: 300px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.chart-card h3 {
+    margin-top: 0;
+    color: #333;
+    font-size: 14px;
+    text-align: center;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.chart-card canvas {
+    flex: 1;
+    width: 100% !important;
+    height: 250px !important;
+}
+
+@media (max-width: 768px) {
+    .charts-container {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .chart-card {
+        height: 280px;
+        padding: 12px;
+    }
+    
+    .chart-card h3 {
+        font-size: 13px;
+    }
+}
+
+#stats {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+#stats p {
+    margin: 8px 0;
+    font-size: 14px;
+    color: #495057;
+}
+
+#stats span {
+    font-weight: 600;
+    color: #0d6efd;
+}
+</style>
 {% endblock %}
