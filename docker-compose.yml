@@ -1,0 +1,33 @@
+services:
+  api:
+    build: .
+    container_name: obesity_api
+    env_file: .env  # ← This loads your local .env
+    environment:    # ← This OVERRIDES specific variables for Docker
+      - DATABASE_URL=postgresql://postgres:sql123@db:5432/obesity
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    volumes:
+      - ./:/app
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+    
+  db:
+    image: postgres:16
+    container_name: obesity_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: sql123
+      POSTGRES_DB: obesity
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:
+
+#docker-compose down
+#docker-compose up --build
+#docker-compose up 
+#http://localhost:8000/

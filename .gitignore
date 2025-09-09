@@ -1,3 +1,4 @@
 .env
 .dockerignore
 __init__.py
+docker_compose.yml

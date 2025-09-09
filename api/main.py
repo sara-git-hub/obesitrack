@@ -1,9 +1,8 @@
-from fastapi import FastAPI, Depends, Request
+from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 from pathlib import Path
 import json
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
 from sqlalchemy import text
 
 from .config import settings
@@ -26,9 +25,6 @@ Base.metadata.create_all(bind=engine)
 # Fichiers statiques
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-
-
-
 # Routes
 app.include_router(auth.router)
 app.include_router(predictions.router)
@@ -37,7 +33,7 @@ app.include_router(admin_web.router)
 app.include_router(web.router)
 
 # Endpoints généraux
-@app.get("/", tags=["general"])
+@app.get("/info", tags=["general"])
 def root():
     return {
         "message": "ObesiTrack API is running!",

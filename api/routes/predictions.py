@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+
 from ..schemas import PredictionRequest, PredictionResponse
 from ..models import User, Prediction
 from ..deps import get_db, get_current_user

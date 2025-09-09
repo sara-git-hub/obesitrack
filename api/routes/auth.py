@@ -42,6 +42,6 @@ def read_current_user(current_user: User = Depends(get_current_user)):
         "id": current_user.id,
         "email": current_user.email,
         "full_name": current_user.full_name,
-        "role": current_user.role,  # Ajouter cette ligne
+        "role": current_user.role,
         "created_at": current_user.created_at
     }
