@@ -21,7 +21,8 @@ obesitrack/
 ├── static/                    # Modèle de Machine Learning
 │   ├── css                    
 │   └── js/  
-│       └── app.js
+|       |__ app.js
+│       └── chart.js
 |── templates/
 │   ├── users.html           
 │   ├── base.html
